@@ -21,3 +21,27 @@ $RECYCLE.BIN/
 # =========================
 # Operating System Files
 # =========================
+
+
+.pdf
+
+/.git
+/CrossValidation
+/Predictions
+/Simulations
+*.gitattributes
+*.gitignore
+*.Rhistory
+
+OLD/
+ARAT - run.R
+Checking fitted vs observed.R
+*.RData
+
+
+Long format met NIHSS sens en neglect.7z
+
+*.sav
+
+*.txt
+
