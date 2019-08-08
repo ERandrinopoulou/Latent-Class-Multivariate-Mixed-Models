@@ -10,13 +10,13 @@ families <- c("gaussian", "binomial")
 
 classes <- 2
 hc <- FALSE
-RM_method <- FALSE #TRUE
+RM_method <- FALSE
 
 source("build_JAGS_code.R")
 source("other_functions.R")
 source("mv_lclme function.R")
 
 
-fitLCLME <- mv_lclme(formulas, data, classes, families, hc, RM_method)
+fitLCLME <- mv_lclme(formulas, data, classes, families, hc, RM_method, predicted)
 
 summary.mvlclme(fitLCLME, classes)
