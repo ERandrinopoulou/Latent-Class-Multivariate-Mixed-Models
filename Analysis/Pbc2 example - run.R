@@ -19,5 +19,4 @@ source("mv_lclme function.R")
 
 fitLCLME <- mv_lclme(formulas, data, classes, families, hc, RM_method, predicted)
 
-# this is a summary
 summary.mvlclme(fitLCLME, classes)
