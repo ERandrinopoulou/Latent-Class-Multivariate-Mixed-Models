@@ -27,11 +27,17 @@ $RECYCLE.BIN/
 
 /.git
 /CrossValidation
-/Predictions
+
 /Simulations
 *.gitattributes
 *.gitignore
 *.Rhistory
+
+/Predictions
+
+/JAGS
+/checks
+ARAT example - run predictions.R
 
 OLD/
 ARAT example - run.R
