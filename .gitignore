@@ -34,7 +34,7 @@ $RECYCLE.BIN/
 *.Rhistory
 
 OLD/
-ARAT - run.R
+ARAT example - run.R
 Checking fitted vs observed.R
 *.RData
 
