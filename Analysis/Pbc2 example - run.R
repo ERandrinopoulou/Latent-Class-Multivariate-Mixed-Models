@@ -11,6 +11,7 @@ families <- c("gaussian", "binomial")
 classes <- 2
 hc <- FALSE
 RM_method <- FALSE
+predicted <- TRUE
 
 source("build_JAGS_code.R")
 source("other_functions.R")
