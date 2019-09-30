@@ -2,13 +2,13 @@ library(JMbayes)
 library(jagsUI)
 library(label.switching)
 
-formulas <- list(serBilir ~ sex + year + (year | id),
+formulas <- list(serBilir ~ sex + ns(year, 2) + (ns(year, 2) | id),
                  spiders ~ sex + year + drug + (1 | id))
 data <- pbc2
 
 families <- c("gaussian", "binomial")
 
-classes <- 2
+classes <- 1
 hc <- FALSE
 RM_method <- FALSE
 predicted <- TRUE
