@@ -69,12 +69,28 @@ extractFrames <- function (formula, data) {
     }
   }
   environment(TermsX) <- environment(TermsZ) <- NULL
+  
+  Xc = scale(X[, -1], center = TRUE, scale = FALSE) # except intercept
+  Xc = cbind(X[,1], Xc)
+  Xs = scale(X[, -1], center = TRUE, scale = TRUE)
+  Xs = cbind(X[,1], Xs)
+  
+  
+  if (ncol(X) >2) {
+    means_X = apply(X[, -1], 2, mean)
+    SDs_X = apply(X[, -1], 2, sd)
+  } else{
+    means_X = mean(X[, -1])
+    SDs_X = sd(X[, -1])
+  }
+  mean_sd_X = means_X/SDs_X
+  
   # extract results
   list(N = nrow(Z), n = length(unique(id)), offset = offset, idVar = idVar, respVar = respVar,
        id = id, y = y, X = X, Z = Z, TermsX = TermsX,
        TermsZ = delete.response(TermsZ), xlev = .getXlevels(TermsX, mfX),
-       Xhc = Xhc, colmns_HC = ind_colmns, colmns_nHC = ind_colmns2,
-       ncx = ncol(X), ncz = ncol(Z))
+       Xc = Xc, Xhc = Xhc, colmns_HC = ind_colmns, colmns_nHC = ind_colmns2,
+       means_X = means_X, ncx = ncol(X), ncz = ncol(Z))
 }
 
 modes <-

@@ -12,7 +12,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     
 
     long_betas <- function(k){
-      longbetas <- paste0("betas", k, 1, "[1:ncx", k, "]", sep = "", collapse = "")  
+      longbetas <- paste0("c_betas", k, 1, "[1:ncx", k, "]", sep = "", collapse = "")  
       longbetas
     }
     
@@ -28,7 +28,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     longCont <- function(k) {
       longStart1 <- paste0(myt(1), "for (i in 1:n", k, ") {\n" )
       longStart2 <- paste0(myt(2), "for (j in offset", k, "[i]:(offset", k, "[i+1] - 1)) {\n" )
-      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", X", k, "[j, 1:ncx", k, "]) +\n", myt(2),
+      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", Xc", k, "[j, 1:ncx", k, "]) +\n", myt(2),
                       " inprod(", paste0(long_b(k), sep = "", collapse = " + "), ", Z", k, "[j, 1:ncz", k, "] )\n")                                                       
       
       
@@ -42,7 +42,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     longBin <- function(k) {
       longStart1 <- paste0(myt(1), "for (i in 1:n", k, ") {\n" )
       longStart2 <- paste0(myt(2), "for (j in offset", k, "[i]:(offset", k, "[i+1] - 1)) {\n" )
-      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", X", k, "[j, 1:ncx", k, "]) +\n", myt(2),
+      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", Xc", k, "[j, 1:ncx", k, "]) +\n", myt(2),
                       " inprod(", paste0(long_b(k), sep = "", collapse = " + "), ", Z", k, "[j, 1:ncz", k, "] )\n")                                                       
       
       
@@ -98,7 +98,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     m = 1
     for (k in 1:K) {
       for (i in 1:classes) {
-        prior.betas[m] <- paste0(myt(), "for (k", k, " in 1:ncx", k, ") {\n", myt(2), "betas", k, i, "[k", k, "] ~ dnorm(0.0, tau_betas", k, i, ")\n", myt(), "} \n")  
+        prior.betas[m] <- paste0(myt(), "for (k", k, " in 1:ncx", k, ") {\n", myt(2), "c_betas", k, i, "[k", k, "] ~ dnorm(0.0, tau_betas", k, i, ")\n", myt(), "} \n")  
         m <- m + 1
       }
     }
@@ -144,9 +144,11 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
       prior.invD <-  paste0(prior.invD, collapse = "")
       if (RM_method == TRUE) {
         classtem <- paste0(class1, sep = "", collapse = " ")
-        paste0(classtem, prior.betas, prior.tau, prior.sigma, prior.invD, prior.invD2)
+        paste0(classtem, prior.betas, 
+               prior.tau, prior.sigma, prior.invD, prior.invD2)
       } else {
-        paste0(prior.betas, prior.tau, prior.sigma, prior.invD, prior.invD2)
+        paste0(prior.betas, 
+          prior.tau, prior.sigma, prior.invD, prior.invD2)
       }
     }
     
@@ -156,13 +158,25 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     }
     
     
+    prior.backTransform_betas <- "string"
+    m = 1
+    for (k in 1:K) {
+      for (i in 1:classes) {
+        prior.backTransform_betas[m] <- paste0(myt(1), "betas", k, i, "[1] = c_betas", k, i, "[1] - inprod(c_betas", k, i, "[2:ncx", k, "], means_X", k, ") \n",
+                                               myt(1), "betas", k, i, "[2:ncx", k, "] = c_betas", k, i, "[2:ncx", k, "] \n")  
+        m <- m + 1
+      }
+    }
+    prior.backTransform_betas <- paste0(prior.backTransform_betas, collapse = "")
+    
+    
     model <- function() {
       end <- paste0("}\n", sep = "", collapse = "")
       if (RM_method == TRUE) {
-        paste0("model { \n", longPar, b, myt(1), "}\n", priorsPar, end)
+        paste0("model { \n", longPar, b, myt(1), "}\n", priorsPar, prior.backTransform_betas, end)
       } else {
         #classtem <- paste0(class1, sep = "", collapse = " ")
-        paste0("model { \n", longPar, b, myt(1), "}\n", priorsPar, end, collapse = "") 
+        paste0("model { \n", longPar, b, myt(1), "}\n", priorsPar, prior.backTransform_betas, end, collapse = "") 
       }
     }
     
@@ -189,7 +203,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     long_betas <- function(k){
       longbetas <- "string" 
       for (i in 1:classes) {
-        longbetas[i] <- paste0("(equals(v[i], ", i, ") * betas", k, i, "[1:ncx", k, "])", sep = "", collapse = "")  
+        longbetas[i] <- paste0("(equals(v[i], ", i, ") * c_betas", k, i, "[1:ncx", k, "])", sep = "", collapse = "")  
       }
       longbetas
     }
@@ -213,7 +227,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     longCont <- function(k) {
       longStart1 <- paste0(myt(1), "for (i in 1:n", k, ") {\n" )
       longStart2 <- paste0(myt(2), "for (j in offset", k, "[i]:(offset", k, "[i+1] - 1)) {\n" )
-      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", X", k, "[j, 1:ncx", k, "]) +\n", myt(2),
+      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", Xc", k, "[j, 1:ncx", k, "]) +\n", myt(2),
                       " inprod(", paste0(long_b(k), sep = "", collapse = " + "), ", Z", k, "[j, 1:ncz", k, "] )\n")                                                       
       
       long2hier <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_u(k), sep = "", collapse = " + "), ", Z", k, "[j, 1:ncz", k, "])\n")                                                       
@@ -229,7 +243,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     longBin <- function(k) {
       longStart1 <- paste0(myt(1), "for (i in 1:n", k, ") {\n" )
       longStart2 <- paste0(myt(2), "for (j in offset", k, "[i]:(offset", k, "[i+1] - 1)) {\n" )
-      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", X", k, "[j, 1:ncx", k, "]) +\n", myt(2),
+      long2 <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_betas(k), collapse = " + "), ", Xc", k, "[j, 1:ncx", k, "]) +\n", myt(2),
                       " inprod(", paste0(long_b(k), sep = "", collapse = " + "), ", Z", k, "[j, 1:ncz", k, "] )\n")                                                       
       
       long2hier <- paste0(myt(3), "muy", k, "[j] <- inprod(", paste0(long_u(k), sep = "", collapse = "+ "), ", Z", k, "[j, 1:ncz", k, "] )\n")                                                       
@@ -349,7 +363,7 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
     m = 1
     for (k in 1:K) {
       for (i in 1:classes) {
-        prior.betas[m] <- paste0(myt(), "for (k", k, " in 1:ncx", k, ") {\n", myt(2), "betas", k, i, "[k", k, "] ~ dnorm(0.0, tau_betas", k, i, ")\n", myt(), "} \n")  
+        prior.betas[m] <- paste0(myt(), "for (k", k, " in 1:ncx", k, ") {\n", myt(2), "c_betas", k, i, "[k", k, "] ~ dnorm(0.0, tau_betas", k, i, ")\n", myt(), "} \n")  
         m <- m + 1
       }
     }
@@ -410,14 +424,25 @@ JAGSmodel <- function(classes, families, hc, RM_method, predicted){
       priorsPar <- paste(priors(k), collapse = "")
     }
     
+    prior.backTransform_betas <- "string"
+    m = 1
+    for (k in 1:K) {
+      for (i in 1:classes) {
+        prior.backTransform_betas[m] <- paste0(myt(1), "betas", k, i, "[1] = c_betas", k, i, "[1] - inprod(c_betas", k, i, "[2:ncx", k, "], means_X", k, ") \n",
+                                               myt(1), "betas", k, i, "[2:ncx", k, "] = c_betas", k, i, "[2:ncx", k, "] \n")  
+        m <- m + 1
+      }
+    }
+    prior.backTransform_betas <- paste0(prior.backTransform_betas, collapse = "")
+    
     
     model <- function() {
       end <- paste0("}\n", sep = "", collapse = "")
       if (RM_method == TRUE) {
-        paste0("model { \n", longPar, b, myt(1), c, myt(1), "}\n", priorsPar, end)
+        paste0("model { \n", longPar, b, myt(1), c, myt(1), "}\n", priorsPar, prior.backTransform_betas, end)
       } else {
         classtem <- paste0(class1, sep = "", collapse = " ")
-        paste0("model { \n", longPar, b, classtem, myt(1), c, myt(1), "}\n", priorsPar, end, collapse = "") 
+        paste0("model { \n", longPar, b, classtem, myt(1), c, myt(1), "}\n", priorsPar, prior.backTransform_betas, end, collapse = "") 
       }
     }
     

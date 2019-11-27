@@ -1,6 +1,5 @@
-mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted){
-  
-  try(setwd("Analysis"))
+mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted, 
+                     control = list(), ...){
   
   ########
   # Data #
@@ -17,7 +16,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   colmns_nHC <- components[grep("colmns_nHC", names(components), fixed = TRUE)]
   seq_outcomes <- seq_len(n_outcomes)
   
-  nams_vars <- c("n", "offset", "Z", "X", "ncx", "ncz", "y")
+  nams_vars <- c("n", "offset", "Z", "X", "Xc", "means_X", "ncx", "ncz", "y")
   vars <- paste0(rep(nams_vars, each = n_outcomes), seq_outcomes)
   #if (any(ind_td <- sapply(colmns_nHC, length))) {
   #  vars <- c(vars, paste0("X", which(ind_td > 0)))
@@ -122,7 +121,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   betas_s <- mapply(x = args$x, y = args$y, z = betas, function(x, y, z) paste0("betas", x, y, " <- ", z))
   betas_s <- paste0(betas_s, sep = "; ", collapse = "")
   eval(parse(text = betas_s))
-
+  
   # CHANGE  
   # var.betas <- lapply(nX, function(x) rep(100, x))
   # var.betas <- lapply(var.betas, function(x) paste0("c(", paste0(x, collapse = ","), ")"))
@@ -137,7 +136,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   var.betas_s <- paste0(var.betas_s, sep = "; ", collapse = "")
   eval(parse(text = var.betas_s))
   
-
+  
   
   
   if (any(families == "gaussian")){
@@ -159,9 +158,9 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   }
   
   
-
   
-  data_priors <- paste0("Data2 <- list(", datamu, ",\n", datainvD, ",\n", databet, ",\n", databetVar, 
+  
+  data_priors <- paste0("Data2 <- list(", datamu, ",\n", datainvD, ",\n", databetVar, 
                         if (any(families == "gaussian")) { paste0(",\n", datatau) }, ")")
   
   eval(parse(text = data_priors))
@@ -172,29 +171,26 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   # MCMC #
   ########
   
-  con <- list(n.processors = parallel::detectCores() - 1, n.chains = 2,
+  con <- list(n.processors = parallel::detectCores() - 1, 
               working.directory = getwd(), clear.model = TRUE,
-              seed = 1L, optimize_only = FALSE, verbose = FALSE)
+              seed = 1L, optimize_only = FALSE, verbose = FALSE, 
+              n.iter = 28000L, n.burnin = 3000L, n.thin = 50L, 
+              n.adapt = 3000L, n.chains = 2L, seed = 1L, n.cores = 1L)
   
-  con$n.iter <- 25000#30000L
-  con$n.burnin <- 20000#20000L
-  con$n.thin <- 10#50L
-  con$n.adapt <- 1000#3000L 
   
-  #control <- c(control, list(...))
+  
+  control <- c(control, list(...))
   namC <- names(con)
-  #con[(namc <- names(control))] <- control
-  # if (!any(namc == "n.thin")) {
-  #   con$n.thin <- if (engine == "JAGS") {
-  #     max(1, floor((con$n.iter - con$n.burnin) * con$n.chains / 1000))
-  #   } else {
-  #     max(1, floor((con$n.iter - con$n.warmup) * con$n.chains / 1000))
-  #   }
-  # }
-  # if (length(noNms <- namc[!namc %in% namC]) > 0)
-  #   warning("unknown names in control: ", paste(noNms, collapse = ", "))
-  # 
-  
+  con[(namc <- names(control))] <- control
+  if (!any(namc == "n.thin")) {
+    con$n.thin <- if (engine == "JAGS") {
+      max(1, floor((con$n.iter - con$n.burnin) * con$n.chains / 1000))
+    } else {
+      max(1, floor((con$n.iter - con$n.warmup) * con$n.chains / 1000))
+    }
+  }
+  if (length(noNms <- namc[!namc %in% namC]) > 0)
+    warning("unknown names in control: ", paste(noNms, collapse = ", "))
   
   ######################
   # Parameters to save #
@@ -209,7 +205,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   params_invD <- paste0('inv.D', seq_len(classes))
   params_pred <- paste0('y', seq_len(n_outcomes), '_pred')
   
-  params <- c(params_betas, params_b, params_invD, "pr", "v", params_pred) 
+  params <- c(params_betas, params_b, params_invD, "pr", "v", if (predicted == TRUE) {params_pred}) 
   
   ############
   # Initials #
@@ -235,20 +231,33 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   # Build JAGS model #
   ####################
   
-  JAGSmodel(classes = classes, families, hc, RM_method, predicted)
+  #JAGSmodel(classes = classes, families, hc, RM_method, predicted)
   
   #############
   # Fit model #
   #############
   
-  n_betas <- length(unlist(Data[grep("Mean.betas", names(Data), fixed = TRUE)]))/classes
-  n_sigma <- length(unlist(Data[grep("tau", names(Data), fixed = TRUE)]))/2
+  n_betas <- sum(unlist(lapply(Data[grep("X", names(Data), fixed = TRUE)], function(x) ncol(x))))
+  #n_sigma <- length(unlist(Data[grep("tau", names(Data), fixed = TRUE)]))/2
   #n_invD <-   sum(lower.tri(Data$priorR.D1, diag = TRUE))
   a <- n_betas #+ n_invD
   Data$prior.cl <- rep(a/2 - 0.1, classes)
   
-  model_name <- "mixedmodel.txt"
+  model_name <- "mixedmodel_NCtest.txt"
+  # Data$priorMeanbetas1 <- rep(0, Data$ncx1)
+  # Data$priorMeanbetas2 <- rep(0, Data$ncx2)
+  # Data$priorMeanbetas3 <- rep(0, Data$ncx3)
+  # Data$priorMeanbetas4 <- rep(0, Data$ncx4)
+  # Data$priorTaubetas1 <- diag(0.01, Data$ncx1)
+  # Data$priorTaubetas2 <- diag(0.01, Data$ncx2)
+  # Data$priorTaubetas3 <- diag(0.01, Data$ncx3)
+  # Data$priorTaubetas4 <- diag(0.01, Data$ncx4)
   
+  # # centering
+  # for(o in 1:n_outcomes){
+  #   code_cen <- paste0("Data$X", o, "_mean <- as.vector(apply(Data$X", o, ", 2, mean))")
+  #   eval(parse(text = code_cen))
+  # }
   
   if (classes != 1 ){
     if (RM_method == TRUE) {
@@ -273,7 +282,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
       
       fit <- jags(data = Data, parameters.to.save = params, #inits = inits, 
                   model.file = file.path(con$working.directory, model_name),
-                  n.chains = con$n.chains, parallel = TRUE, n.cores = 7,
+                  n.chains = con$n.chains, parallel = TRUE, n.cores = con$cores,
                   n.adapt = con$n.adapt, n.iter = con$n.iter, n.burnin = con$n.burnin,
                   n.thin = con$n.thin, seed = con$seed, verbose = con$verbose)
       
@@ -312,9 +321,9 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
       fit <- jags(data = Data, parameters.to.save = params, #inits = inits, 
                   model.file = file.path(con$working.directory, model_name),
                   n.chains = con$n.chains, parallel = TRUE, #con$n.processors > 1, 
-                  n.cores = 5,
+                  n.cores = con$cores,
                   n.adapt = con$n.adapt, n.iter = con$n.iter, n.burnin = con$n.burnin,
-                  n.thin = con$n.thin, seed = con$seed, verbose = con$verbose)
+                  n.thin = con$n.thin, seed = NULL, verbose = con$verbose)
       
       
       
@@ -324,71 +333,98 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
       
       
       mcmc.pars <- fit$sims.list[-which(names(fit$sims.list) %in% c("pr", "v", "deviance", params[grep("tau", params)], 
-                                                                    params[grep("sigma", params)],
+                                                                    params[grep("sigma", params)],  params[grep("inv.D", params)],
                                                                     params[grep("y", params)]))]
-      mcmc.pars <- as.data.frame(mcmc.pars)
-      
-      class_par <- list()
-      for (i in 1:classes) {
-        class_par[[i]] <- mcmc.pars[grep(paste0(i, "."), names(mcmc.pars), fixed = TRUE)]
-      } 
-      
-      sort_names <- lapply(class_par, function(x) paste0(1:dim(class_par[[i]])[2], "_", colnames(x)))
-      for (i in 1:classes){
-        colnames(class_par[[i]]) <- sort_names[[i]]
+      iter_per_chain <- (con$n.iter - con$n.burnin)/con$n.thin
+      vec.iter <- seq(1, (iter_per_chain * con$n.chains) + iter_per_chain, by = iter_per_chain)
+      for (p in 1:con$n.chains){
+        mcmc.chainA <- paste0("mcmc.pars.chain", p, " <- lapply(mcmc.pars[names(mcmc.pars) %in% c(params[grep('betas', params)])], function(x) x[", vec.iter[p], ":", (vec.iter[p+1]-1), ", ])")
+        eval(parse(text = mcmc.chainA))
+        mcmc.chainB <- paste0("mcmc.pars.chain", p, " <- c(mcmc.pars.chain", p, ", lapply(mcmc.pars[!names(mcmc.pars) %in% c(params[grep('betas', params)])], function(x) x[", vec.iter[p], ":", (vec.iter[p+1]-1), ", , ]))")
+        eval(parse(text = mcmc.chainB))
+        
+        eval(parse(text = paste0("mcmc.pars.chain", p, " <- as.data.frame(mcmc.pars.chain", p, ")")))
       }
       
-      DD <- list()
-      for (i in 1:dim(class_par[[1]])[2]){
-        DD[[i]] <- as.data.frame(lapply(class_par, "[", , i))
-        colnames(DD[[i]]) <- unlist(lapply(class_par, function(x) colnames(x)[i]))
+      
+      for (l in 1:con$n.chains){
+        eval(parse(text = paste0("mcmc.pars <- mcmc.pars.chain", l)))
+        
+        class_par <- list()
+        for (i in 1:classes) {
+          class_par[[i]] <- mcmc.pars[grep(paste0(i, "."), names(mcmc.pars), fixed = TRUE)]
+        } 
+        
+        sort_names <- lapply(class_par, function(x) paste0(1:dim(class_par[[classes]])[2], "_", colnames(x)))
+        for (i in 1:classes){
+          colnames(class_par[[i]]) <- sort_names[[i]]
+        }
+        
+        DD <- list()
+        for (i in 1:dim(class_par[[1]])[2]){
+          DD[[i]] <- as.data.frame(lapply(class_par, "[", , i))
+          colnames(DD[[i]]) <- unlist(lapply(class_par, function(x) colnames(x)[i]))
+        }
+        DD <- array(as.numeric(unlist(DD)), dim = c(dim(class_par[[1]])[1], classes, dim(class_par[[1]])[2]))
+        
+        p <- fit$sims.list$pr[vec.iter[l]:(vec.iter[l+1]-1),,]
+        run <- stephens(p)
+        
+        reordered.mcmc <- permute.mcmc(DD, run$permutations)
+        list_reordered.mcmc <- lapply(seq(dim(reordered.mcmc$output)[3]), function(x) reordered.mcmc$output[ , , x])
+        
+        for (i in seq(1, dim(class_par[[1]])[2])){
+          vec_name <- unlist(lapply(class_par, function(x) colnames(x)[i]))
+          vec_name <- sub(".*?_","", vec_name)
+          #vec_name <- gsub("\\..*","",a)
+          colnames(list_reordered.mcmc[[i]]) <- vec_name
+        }
+        
+        mat_reordered.mcmc <- do.call(cbind, list_reordered.mcmc)
+        
+        mat_betas <- list()
+        for (i in 1:length(params_betas)){
+          mat_betas[[i]] <- mat_reordered.mcmc[, grep(params_betas[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
+        }
+        mat_betas  <- mat_betas[unlist(lapply(mat_betas, length) != 0)] 
+        namesbetas1 <- params_betas[-(grep(c("tau"), params_betas, fixed = TRUE))]
+        names(mat_betas) <- namesbetas1[-(grep(c("sigma"), namesbetas1, fixed = TRUE))]
+        
+        mat_b <- list()
+        for (i in 1:length(params_b)){
+          mat_b. <- mat_reordered.mcmc[, grep(params_b[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
+          mat_b[[i]] <- array(mat_b., dim = c(dim(mat_b.)[1], 
+                                              eval(parse(text = paste0("Data1$n", i))), Data$n_RE))
+        }
+        names(mat_b) <- params_b
+        
+        
+        # mat_invD <- list()
+        # for (i in 1:length(params_invD)){
+        #   mat_invD. <- mat_reordered.mcmc[, grep(params_invD[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
+        #   mat_invD[[i]] <- array(mat_invD., dim = c(dim(mat_invD.)[1], 
+        #                                             Data$n_RE, Data$n_RE))
+        # }
+        # names(mat_invD) <- params_invD
+        
+        new_sims.list <- do.call(c, list(mat_betas, mat_b, #mat_invD, 
+                                         fit$sims.list[which(names(fit$sims.list) %in% c("pr", "v", "deviance", params[grep("tau", params)], 
+                                                                                         params[grep("sigma", params)],
+                                                                                         params[grep("y", params)], params[grep("inv.D", params)]))]))
+        eval(parse(text = paste0("new_sims.list", l, " <-new_sims.list")))
+        
       }
-      DD <- array(as.numeric(unlist(DD)), dim = c(dim(class_par[[1]])[1], classes, dim(class_par[[1]])[2]))
       
-      p <- fit$sims.list$pr
-      run <- stephens(p)
-      
-      reordered.mcmc <- permute.mcmc(DD, run$permutations)
-      list_reordered.mcmc <- lapply(seq(dim(reordered.mcmc$output)[3]), function(x) reordered.mcmc$output[ , , x])
-      
-      for (i in seq(1, dim(class_par[[1]])[2])){
-        vec_name <- unlist(lapply(class_par, function(x) colnames(x)[i]))
-        vec_name <- sub(".*?_","", vec_name)
-        #vec_name <- gsub("\\..*","",a)
-        colnames(list_reordered.mcmc[[i]]) <- vec_name
-      }
-      
-      mat_reordered.mcmc <- do.call(cbind, list_reordered.mcmc)
-      
-      mat_betas <- list()
-      for (i in 1:length(params_betas)){
-        mat_betas[[i]] <- mat_reordered.mcmc[, grep(params_betas[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
-      }
-      mat_betas  <- mat_betas[unlist(lapply(mat_betas, length) != 0)] 
-      namesbetas1 <- params_betas[-(grep(c("tau"), params_betas, fixed = TRUE))]
-      names(mat_betas) <- namesbetas1[-(grep(c("sigma"), namesbetas1, fixed = TRUE))]
-      
-      mat_b <- list()
-      for (i in 1:length(params_b)){
-        mat_b. <- mat_reordered.mcmc[, grep(params_b[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
-        mat_b[[i]] <- array(mat_b., dim = c(dim(mat_b.)[1], 
-                                            eval(parse(text = paste0("Data1$n", i))), Data$n_RE))
-      }
-      names(mat_b) <- params_b
+      new_sims.list <- new_sims.list1
+      # combine chains and fix label switching problem between chains
+      ## incomplete (works for 1 chain only at the moment)
+      # order(c(median(new_sims.list1$betas11[,1]),median(new_sims.list1$betas12[,1]), median(new_sims.list1$betas13[,1])))
+      # order(c(median(new_sims.list2$betas11[,1]),median(new_sims.list2$betas12[,1]), median(new_sims.list2$betas13[,1])))
+      # 
+      # order(c(median(new_sims.list1$betas11[,2]),median(new_sims.list1$betas12[,2]), median(new_sims.list1$betas13[,2])))
+      # order(c(median(new_sims.list2$betas11[,2]),median(new_sims.list2$betas12[,2]), median(new_sims.list2$betas13[,2])))
       
       
-      mat_invD <- list()
-      for (i in 1:length(params_invD)){
-        mat_invD. <- mat_reordered.mcmc[, grep(params_invD[i], colnames(mat_reordered.mcmc), fixed = TRUE)]
-        mat_invD[[i]] <- array(mat_invD., dim = c(dim(mat_invD.)[1], 
-                                                  Data$n_RE, Data$n_RE))
-      }
-      names(mat_invD) <- params_invD
-      
-      new_sims.list <- do.call(c, list(mat_betas, mat_b, mat_invD, 
-                                       fit$sims.list[which(names(fit$sims.list) %in% c("pr", "v", "deviance", params[grep("tau", params)], 
-                                                                                       params[grep("sigma", params)],
-                                                                                       params[grep("y", params)]))]))
       
       # #### test ####
       # head(new_sims.list$betas11)

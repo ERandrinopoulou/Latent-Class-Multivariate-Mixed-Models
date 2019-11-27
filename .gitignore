@@ -27,8 +27,9 @@ $RECYCLE.BIN/
 
 /.git
 /CrossValidation
-
 /Simulations
+/OLD
+/Check centering
 *.gitattributes
 *.gitignore
 *.Rhistory
