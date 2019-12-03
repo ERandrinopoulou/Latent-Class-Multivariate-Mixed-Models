@@ -182,3 +182,5 @@ summary.mvlclme <- function (object, classes, ...) {
   class(out) <- "summary.mvlclme"
   out
 }
+
+

@@ -17,6 +17,12 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   seq_outcomes <- seq_len(n_outcomes)
   
   nams_vars <- c("n", "offset", "Z", "X", "Xc", "means_X", "ncx", "ncz", "y")
+    
+    # 
+    # "N", "id", "X", "Z", "Z_", "Zinv", "Zv", "Ztinv", "X", "Xhc", "ncx", "y", "n", "offset",
+    #              "ZrowsStart", "ZrowsEnd","Xc", "Xs", "Zc", "Zs", "XhcC", "XhcS",
+    #              "means_X", "SDs_X", "mean_sd_X", "means_Z", "SDs_Z", "mean_sd_Z",
+    #              "means_Xhc", "SDs_Xhc", "mean_sd_Xhc", "colmns_nHC")
   vars <- paste0(rep(nams_vars, each = n_outcomes), seq_outcomes)
   #if (any(ind_td <- sapply(colmns_nHC, length))) {
   #  vars <- c(vars, paste0("X", which(ind_td > 0)))
@@ -231,7 +237,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   # Build JAGS model #
   ####################
   
-  #JAGSmodel(classes = classes, families, hc, RM_method, predicted)
+  JAGSmodel(classes = classes, families, hc, RM_method, predicted)
   
   #############
   # Fit model #
@@ -243,7 +249,7 @@ mv_lclme <- function(formulas, data, classes, families, hc, RM_method, predicted
   a <- n_betas #+ n_invD
   Data$prior.cl <- rep(a/2 - 0.1, classes)
   
-  model_name <- "mixedmodel_NCtest.txt"
+  model_name <- "mixedmodel.txt"
   # Data$priorMeanbetas1 <- rep(0, Data$ncx1)
   # Data$priorMeanbetas2 <- rep(0, Data$ncx2)
   # Data$priorMeanbetas3 <- rep(0, Data$ncx3)

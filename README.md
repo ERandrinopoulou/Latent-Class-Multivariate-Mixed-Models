@@ -11,8 +11,8 @@ An example on the Pbc2 data can be found in the Analysis folder.
 The arguments of the mv_lvlme function are:
 
 - formulas: the formulas for the multivariate mixed model (as a list e.g.: 
-                                   formulas <- list(serBilir ~ sex + year + (year | id),
-                                                    spiders ~ sex + year + drug + (1 | id))
+                                   formulas <- list(serBilir ~ year + sex + (year | id),
+                                                    spiders ~ year + sex + drug + (1 | id))
 - data: data set
 - classes: how many classes we want to assume
 - families: the families of the outcomes
